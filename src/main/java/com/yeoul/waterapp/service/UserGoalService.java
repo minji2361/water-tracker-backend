@@ -3,7 +3,6 @@ package com.yeoul.waterapp.service;
 import com.yeoul.waterapp.domain.User;
 import com.yeoul.waterapp.dto.UserGoalResponse;
 import com.yeoul.waterapp.repository.UserRepository;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -11,13 +10,14 @@ import java.time.Period;
 import java.time.format.DateTimeParseException;
 
 @Service
-@RequiredArgsConstructor
 public class UserGoalService {
 
     private final UserRepository userRepository;
-
-    // MVP 기본: 30ml/kg
     private static final int ML_PER_KG = 30;
+
+    public UserGoalService(UserRepository userRepository) {
+        this.userRepository = userRepository;
+    }
 
     public UserGoalResponse getGoal(Long userId) {
         User user = userRepository.findById(userId)
@@ -27,27 +27,27 @@ public class UserGoalService {
         String gender = normalizeGender(user.getGender());
 
         int baseMl = calcBaseMl(age, gender);
-
         Double weightKg = user.getWeight();
         int weightBasedMl = calcWeightBasedMl(weightKg);
 
         GoalResult mixed = mixGoal(age, baseMl, weightBasedMl);
 
-        return UserGoalResponse.builder()
-                .userId(user.getId())
-                .age(age)
-                .gender(gender)
-                .weightKg(weightKg)
-                .baseMl(baseMl)
-                .weightBasedMl(weightBasedMl)
-                .goalMl(mixed.goalMl)
-                .rule(mixed.rule)
-                .build();
+        UserGoalResponse response = new UserGoalResponse();
+        response.setUserId(user.getId());
+        response.setAge(age);
+        response.setGender(gender);
+        response.setWeightKg(weightKg);
+        response.setBaseMl(baseMl);
+        response.setWeightBasedMl(weightBasedMl);
+        response.setGoalMl(mixed.getGoalMl());
+        response.setRule(mixed.getRule());
+
+        return response;
     }
 
     private int calcAge(String birthDate) {
         try {
-            LocalDate birth = LocalDate.parse(birthDate); // yyyy-MM-dd
+            LocalDate birth = LocalDate.parse(birthDate);
             LocalDate today = LocalDate.now();
             int years = Period.between(birth, today).getYears();
             if (years < 0) throw new IllegalArgumentException("birthDate is in the future");
@@ -75,19 +75,16 @@ public class UserGoalService {
     }
 
     private int calcWeightBasedMl(Double weightKg) {
-        if (weightKg == null) return 0;     // 체중 없으면 계산 불가
+        if (weightKg == null) return 0;
         if (weightKg <= 0) throw new IllegalArgumentException("weight must be > 0");
-        // 소수 체중도 고려 (55.5kg 등)
         return (int) Math.round(weightKg * ML_PER_KG);
     }
 
     private GoalResult mixGoal(int age, int baseMl, int weightBasedMl) {
-        // 미성년: base만 사용 (보수적 MVP)
         if (age <= 17) {
             return new GoalResult(baseMl, "MINOR_BASE_ONLY");
         }
 
-        // 성인: base vs weightBased 중 큰 값 선택
         int mixed = baseMl;
         String rule = "ADULT_BASE_ONLY";
 
@@ -96,7 +93,6 @@ public class UserGoalService {
             rule = (mixed == weightBasedMl) ? "ADULT_MAX_WEIGHT_BASED" : "ADULT_MAX_BASE";
         }
 
-        // 성인 클램프(너무 낮거나/너무 높지 않게)
         mixed = clamp(mixed, 1500, 4000);
         rule = rule + "_CLAMP_1500_4000";
 
@@ -116,6 +112,14 @@ public class UserGoalService {
         private GoalResult(int goalMl, String rule) {
             this.goalMl = goalMl;
             this.rule = rule;
+        }
+
+        public int getGoalMl() {
+            return goalMl;
+        }
+
+        public String getRule() {
+            return rule;
         }
     }
 }

@@ -6,19 +6,23 @@ import com.yeoul.waterapp.dto.DrinkCreateRequest;
 import com.yeoul.waterapp.dto.DrinkResponse;
 import com.yeoul.waterapp.repository.DrinkLogRepository;
 import com.yeoul.waterapp.repository.UserRepository;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.*;
 import java.time.format.DateTimeParseException;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
 public class DrinkLogService {
 
     private final UserRepository userRepository;
     private final DrinkLogRepository drinkLogRepository;
+
+    public DrinkLogService(UserRepository userRepository, DrinkLogRepository drinkLogRepository) {
+        this.userRepository = userRepository;
+        this.drinkLogRepository = drinkLogRepository;
+    }
 
     public DrinkResponse createDrink(Long userId, DrinkCreateRequest request) {
         if (request.getAmountMl() == null || request.getAmountMl() <= 0) {
@@ -30,19 +34,13 @@ public class DrinkLogService {
 
         LocalDateTime drankAt = parseTimestampOrNow(request.getTimestamp());
 
-        DrinkLog saved = drinkLogRepository.save(
-                DrinkLog.builder()
-                        .user(user)
-                        .amountMl(request.getAmountMl())
-                        .drankAt(drankAt)
-                        .build()
-        );
+        DrinkLog log = new DrinkLog(user, request.getAmountMl(), drankAt);
+        DrinkLog saved = drinkLogRepository.save(log);
 
         return toResponse(saved);
     }
 
     public List<DrinkResponse> getDrinksByDate(Long userId, String date) {
-        // date: yyyy-MM-dd
         LocalDate targetDate = parseDate(date);
 
         LocalDateTime start = targetDate.atStartOfDay();
@@ -52,7 +50,7 @@ public class DrinkLogService {
                 .findByUser_IdAndDrankAtBetweenOrderByDrankAtAsc(userId, start, end)
                 .stream()
                 .map(this::toResponse)
-                .toList();
+                .collect(Collectors.toList());
     }
 
     public void deleteDrink(Long drinkId) {
@@ -63,12 +61,12 @@ public class DrinkLogService {
     }
 
     private DrinkResponse toResponse(DrinkLog log) {
-        return DrinkResponse.builder()
-                .id(log.getId())
-                .userId(log.getUser().getId())
-                .amountMl(log.getAmountMl())
-                .drankAt(log.getDrankAt().toString())
-                .build();
+        return new DrinkResponse(
+                log.getId(),
+                log.getUser().getId(),
+                log.getAmountMl(),
+                log.getDrankAt().toString()
+        );
     }
 
     private LocalDate parseDate(String date) {
@@ -87,7 +85,6 @@ public class DrinkLogService {
             return LocalDateTime.now();
         }
         try {
-            // ISO-8601 LocalDateTime: 2026-02-11T09:30:00
             return LocalDateTime.parse(timestamp);
         } catch (DateTimeParseException e) {
             throw new IllegalArgumentException("timestamp must be ISO-8601 like 2026-02-11T09:30:00");

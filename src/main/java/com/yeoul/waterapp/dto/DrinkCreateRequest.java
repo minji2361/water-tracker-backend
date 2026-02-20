@@ -1,11 +1,25 @@
 package com.yeoul.waterapp.dto;
 
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-
-@Getter
-@NoArgsConstructor
 public class DrinkCreateRequest {
-    private Integer amountMl;     // 예: 200
-    private String timestamp;     // ISO-8601 예: "2026-02-11T09:30:00"
+    private Integer amountMl;
+    private String timestamp;
+
+    public DrinkCreateRequest() {
+    }
+
+    public Integer getAmountMl() {
+        return amountMl;
+    }
+
+    public void setAmountMl(Integer amountMl) {
+        this.amountMl = amountMl;
+    }
+
+    public String getTimestamp() {
+        return timestamp;
+    }
+
+    public void setTimestamp(String timestamp) {
+        this.timestamp = timestamp;
+    }
 }
